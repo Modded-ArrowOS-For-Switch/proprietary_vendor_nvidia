@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright (c) 2014-2020, NVIDIA Corporation.  All Rights Reserved.
+# Copyright (c) 2014-2021, NVIDIA Corporation.  All Rights Reserved.
 #
 # NVIDIA Corporation and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -19,6 +19,7 @@ sys.path.insert(1, os.getcwd())
 import getopt
 import collections
 import subprocess
+import shlex
 import shutil
 import string
 import cmd
@@ -649,8 +650,7 @@ class tegraflashcmds(cmd.Cmd):
         tegraflash_update_env()
         args = { }
         if not params == "":
-            params = params.strip().replace('  ', ' ')
-            args = params.split(' ')
+            args = shlex.split(params)
 
         try:
             if len(args) == 0:

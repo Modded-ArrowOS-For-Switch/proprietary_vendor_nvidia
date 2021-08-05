@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2017-2021, NVIDIA CORPORATION.  All rights reserved.
 #
 # NVIDIA CORPORATION and its licensors retain all intellectual property
 # and proprietary rights in and to this software, related documentation
@@ -66,6 +66,23 @@ import argparse
 import textwrap
 
 top_var = "TOP"
+
+# BUP magic:
+# Bump it with the BUP version.
+bup_magic = "NVIDIA__BLOB__V2"
+# BUP vesioin:
+# Bump it when the BUP blob structure updated.
+bup_bcd_ver_maj = 0x2
+bup_bcd_ver_min = 0x1
+# bcdBUP release version (binary coded decimal number):
+# Bump it in yymm when BUP released.
+# Use 2106 for the initial release with yymm in version format.
+bup_bcd_ver_yy = 0x21
+bup_bcd_ver_mm = 0x6
+# BUP release revision:
+# It supports upto 4, and should be reset to 0 once the bcdBUP version is updated.
+# Bump it when BUP released within same month.
+bup_rev = 0x0
 
 def parse_args():
     parser = argparse.ArgumentParser(description=textwrap.dedent('''\
@@ -206,9 +223,19 @@ def inspect_BUP(arg):
 class payload():
     gpt_part_name_len_max = 36
 
+    def gen_version(self):
+        # bit[27:24]: BUP minor version in bcd:
+        # bit[23:16]: BUP major version in bcd:
+        # bit[15:14]: BUP release revision:
+        # bit[12:8]: BUP release version in bcdMonth:
+        # bit[7:0]: BUP release version in bcdYear:
+        version = bup_bcd_ver_yy | bup_bcd_ver_mm << 8 | bup_rev << 14
+        version = version | bup_bcd_ver_maj << 16 | bup_bcd_ver_min << 24
+        return version
+
     def __init__(self, args):
-        self.magic = 'NVIDIA__BLOB__V2'
-        self.version = 0x00020000
+        self.magic = bup_magic
+        self.version = self.gen_version()
         self.blob_size_pos = struct.calcsize('=16sI')
         self.header_packing = '=16sIIIIII'
         self.uncomp_size_pos = struct.calcsize('=16sIIIII')
@@ -313,7 +340,8 @@ class update_payload(payload):
             part_name = entry_info[1]
 
             try:
-                version = int(entry_info[2])
+                # store entry list version in bcd number
+                version = int(entry_info[2], 16)
             except ValueError:
                 version = 0
 
@@ -451,9 +479,10 @@ class inspect_update_payload(update_payload):
         self._generate_entry_list()
 
     def _valid(self):
-        expected_header_tuple = (self.magic, self.version, self.blob_type)
-        input_header_tuple = self.blob_header_tuple[0:2] + (self.blob_header_tuple[5],)
-        return input_header_tuple == expected_header_tuple
+        if (self.blob_header_dict['magic'] == self.magic) and (self.blob_header_dict['type'] == self.blob_type):
+            return 1
+        else:
+            return 0
 
     def _generate_entry_list(self):
         for idx, blob_entry in enumerate(self.blob_entry_list):
@@ -473,10 +502,31 @@ class inspect_update_payload(update_payload):
                                  "Payload blob may be corrupt.\r\n" \
                                 )
 
+    def show_readable_version(self):
+        # readable version: maj.min-yy.mm-rev
+        ver = self.blob_header_dict['version']
+        bcd_ver_min = (ver & 0x0f000000) >> 24
+        bcd_ver_maj = (ver & 0x00ff0000) >> 16
+        rev = (ver & 0x0000c000) >> 14
+        bcd_ver_mm = (ver & 0x00001f00) >> 8
+        bcd_ver_yy = ver & 0x000000ff
+        version = "v"
+        version = version + "{:x}".format(bcd_ver_maj)
+        version = version + "."
+        version = version + "{:x}".format(bcd_ver_min)
+        version = version + "-"
+        version = version + "20" + "{:x}".format(bcd_ver_yy)
+        version = version + "."
+        version = version + "{:x}".format(bcd_ver_mm)
+        version = version + "-"
+        version = version + "{:x}".format(rev)
+        return version
+
     def print_blob_header(self):
         print "BLOB HEADER:"
         print "       Magic: " + self.blob_header_dict['magic']
-        print "     Version: " + format(self.blob_header_dict['version'], "#010x")
+        print "     Version: " + self.show_readable_version() \
+                               + " (" + format(self.blob_header_dict['version'], "#010x") + ")"
         print "   Blob Size: " + "{:,}".format(self.blob_header_dict['blob_size']) + " bytes"
         print " Header Size: " + "{:,}".format(self.blob_header_dict['header_size']) + " bytes"
         print " Entry Count: " + str(self.blob_header_dict['entry_count']) + " partition(s)"
@@ -502,7 +552,7 @@ class inspect_update_payload(update_payload):
                 print str(blob_entry['part_name']).strip(' \t\n\0').rjust(self.blob_entry_max_width_list[0]) + " |",
                 print str(blob_entry['offset']).rjust(self.blob_entry_max_width_list[1]) + " |",
                 print str(blob_entry['part_size']).rjust(self.blob_entry_max_width_list[2]) + " |",
-                print str(blob_entry['version']).center(self.blob_entry_max_width_list[3]) + " |",
+                print str("{:x}".format(blob_entry['version'])).center(self.blob_entry_max_width_list[3]) + " |",
                 print str(blob_entry['op_mode']).center(self.blob_entry_max_width_list[4]) + " |",
                 print str(blob_entry['tnspec']).strip(' \t\n\0').ljust(self.blob_entry_max_width_list[5]) + " |"
             except:
