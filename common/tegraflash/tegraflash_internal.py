@@ -1975,10 +1975,10 @@ def tegraflash_oem_encrypt_and_sign_file(in_file, header , magic_id):
         command.extend(['--chip', values['--chip'], values['--chip_major']])
 
     command.extend(['--updatesigheader', signed_file, sig_file, sig_type])
-    if sig_type is not "zerosbk":
+    if sig_type != "zerosbk":
         if os.path.isfile(tegrasign_values['--pubkeyhash']):
            command.extend(['--pubkeyhash', tegrasign_values['--pubkeyhash']])
-    if sig_type is "oem-rsa":
+    if sig_type == "oem-rsa":
         if os.path.isfile(tegrasign_values['--getmontgomeryvalues']):
             command.extend(['--setmontgomeryvalues', tegrasign_values['--getmontgomeryvalues']])
 
@@ -2413,7 +2413,7 @@ def tegraflash_boot_mb2_applet():
     tegraflash_boot('recovery')
 
     count = 30
-    while count is not 0 and not check_ismb2():
+    while count != 0 and not check_ismb2():
         time.sleep(1)
         count = count - 1
 
@@ -2422,7 +2422,7 @@ def tegraflash_poll_applet_bl():
         return
     count = 30;
     enable_print = True;
-    while count is not 0:
+    while count != 0:
         time.sleep(1)
         count = count - 1
         if check_ismb1() or check_ismb2() or check_iscpubl():
