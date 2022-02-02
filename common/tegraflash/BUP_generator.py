@@ -235,7 +235,7 @@ class payload():
 
     def __init__(self, args):
         self.magic = bup_magic
-        self.version = self.gen_version()
+        self.version = 0x00020000 if args.blob_type == "bmp" else self.gen_version()
         self.blob_size_pos = struct.calcsize('=16sI')
         self.header_packing = '=16sIIIIII'
         self.uncomp_size_pos = struct.calcsize('=16sIIIII')
